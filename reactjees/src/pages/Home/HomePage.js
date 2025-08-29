@@ -35,6 +35,9 @@ const HomePage = () => {
       <Link to="/todos" style={buttonStyle}>
         Lihat Daftar Todo
       </Link>
+      <Link to="/dht22" style={buttonStyle}>
+        Lihat Sensor DHT22
+      </Link>
     </div>
   );
 };

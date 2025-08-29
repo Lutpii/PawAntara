@@ -1,11 +1,65 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const http = require("http"); // Diperlukan untuk WebSocket
+const WebSocket = require("ws"); // Library WebSocket
+const mqtt = require("mqtt"); // Library MQTT
+
 const app = express();
 const todoRoutes = require("./routes/tododb.js");
 const { todos } = require("./routes/todo.js"); // Menambahkan ini untuk mengimpor data dummy
 const db = require("./database/db");
 const port = process.env.PORT;
+
+// Membuat server HTTP dan WebSocket
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+// Pengaturan dan koneksi ke MQTT Broker
+const MQTT_BROKER = "mqtt://192.168.137.1"; // sesuaikan lihat IP address broker MQTT
+const MQTT_PORT = 1883;
+const MQTT_TOPICS = ["sensor/dht22/suhu", "sensor/dht22/kelembapan"];// sesuaikan topik yang ingin di-subscribe
+
+const mqttClient = mqtt.connect(MQTT_BROKER, {
+  port: MQTT_PORT,
+  username: "mqtt", // sesuaikan di broker MQTT
+  password: "admin", // sesuaikan di broker MQTT
+});
+
+mqttClient.on("connect", () => {
+  console.log("Terhubung ke MQTT Broker!");
+  MQTT_TOPICS.forEach((topic) => {
+    mqttClient.subscribe(topic, (err) => {
+      if (!err) {
+        console.log(`Berhasil subscribe ke topik: ${topic}`);
+      }
+    });
+  });
+});
+
+// Menerima pesan dari MQTT dan meneruskannya ke semua klien WebSocket
+mqttClient.on("message", (topic, payload) => {
+  console.log(`Pesan diterima dari topik ${topic}: ${payload.toString()}`);
+  const dataToSend = JSON.stringify({
+    topic: topic,
+    payload: payload.toString(),
+  });
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(dataToSend);
+    }
+  });
+});
+
+// Menangani koneksi baru dari klien (React)
+wss.on("connection", (ws) => {
+  console.log("Klien (React) terhubung via WebSocket");
+  ws.on("close", () => {
+    console.log("Koneksi klien (React) terputus");
+  });
+});
+
 
 // file statis
 const expressLayouts = require("express-ejs-layouts");
@@ -167,6 +221,7 @@ app.use((req, res) => {
   res.status(404).send("404 - Page Not Found");
 });
 
-app.listen(port, () => {
-  console.log(`Server berjalan di http://localhost:${port}`);
+// UBAH BARIS INI: Gunakan server.listen, bukan app.listen
+server.listen(port, () => {
+  console.log(`Server Express & WebSocket berjalan di http://localhost:${port}`);
 });
