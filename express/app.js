@@ -7,6 +7,11 @@ const mqtt = require("mqtt"); // Library MQTT
 
 const app = express();
 const todoRoutes = require("./routes/tododb.js");
+// --- TAMBAHKAN INI ---
+const authRoutes = require("./routes/auth.js"); // Impor rute otentikasi
+const authMiddleware = require("./middleware/auth"); // Impor middleware otentikasi
+// --------------------
+
 const { todos } = require("./routes/todo.js"); // Menambahkan ini untuk mengimpor data dummy
 const db = require("./database/db");
 const port = process.env.PORT;
@@ -18,7 +23,7 @@ const wss = new WebSocket.Server({ server });
 // Pengaturan dan koneksi ke MQTT Broker
 const MQTT_BROKER = "mqtt://192.168.137.1"; // sesuaikan lihat IP address broker MQTT
 const MQTT_PORT = 1883;
-const MQTT_TOPICS = ["sensor/dht22/suhu", "sensor/dht22/kelembapan"];// sesuaikan topik yang ingin di-subscribe
+const MQTT_TOPICS = ["sensor/dht22/suhu", "sensor/dht22/kelembapan"]; // sesuaikan topik yang ingin di-subscribe
 
 const mqttClient = mqtt.connect(MQTT_BROKER, {
   port: MQTT_PORT,
@@ -60,7 +65,6 @@ wss.on("connection", (ws) => {
   });
 });
 
-
 // file statis
 const expressLayouts = require("express-ejs-layouts");
 app.use(expressLayouts);
@@ -70,6 +74,14 @@ app.use(cors());
 
 app.use(express.json());
 
+// --- GUNAKAN RUTE OTENTIKASI ---
+app.use("/api/auth", authRoutes);
+// -----------------------------
+
+// --- LINDUNGI RUTE TODO DENGAN MIDDLEWARE ---
+// Semua rute yang didefinisikan di dalam todoRoutes sekarang akan dilindungi
+app.use("/api/todos", authMiddleware, todoRoutes);
+// ------------------------------------------
 // Atur EJS sebagai view engine
 app.set("view engine", "ejs");
 
@@ -223,5 +235,7 @@ app.use((req, res) => {
 
 // UBAH BARIS INI: Gunakan server.listen, bukan app.listen
 server.listen(port, () => {
-  console.log(`Server Express & WebSocket berjalan di http://localhost:${port}`);
+  console.log(
+    `Server Express & WebSocket berjalan di http://localhost:${port}`
+  );
 });
